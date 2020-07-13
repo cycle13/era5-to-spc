@@ -1,0 +1,4 @@
+__pycache__/
+data/
+sharptab/__pycache__/
+.DS_Store
