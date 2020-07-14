@@ -4,6 +4,71 @@ from numba import njit
 from sharptab.constants import MISSING, TOL
 
 @njit
+def weighted_average(field, weight):
+    '''
+    Support np.average() functionality for numba.
+
+    Numba does not supported np.average(). Without weights this is equivalent
+    to np.mean(), but there are several pressure-weighted variables which rely
+    on this functionality.
+
+    Parameters
+    ----------
+    field : numpy array
+        Array containing data to be averaged
+    weight : numpy array
+        An array of weights associated with the values in a. Each value in a
+        contributes to the average according to its associated weight.
+
+    Returns
+    -------
+    field : number
+        Weighted average of the field input.
+
+    '''
+    c = 0.
+    cw = 0.
+    for ind in range(field.shape[0]):
+        c += field[ind] * weight[ind]
+        cw += weight[ind]
+    field = c / cw
+    return field
+
+@njit
+def MS2KTS(val):
+    '''
+    Convert meters per second to knots
+
+    Parameters
+    ----------
+    val : float, numpy_array
+        Speed (m/s)
+
+    Returns
+    -------
+    Val converted to knots (float)
+
+    '''
+    return val * 1.94384449
+
+@njit
+def KTS2MS(val):
+    '''
+    Convert knots to meters per second
+
+    Parameters
+    ----------
+    val : float, numpy_array
+        Speed (kts)
+
+    Returns
+    -------
+        Val converted to meters per second (float)
+
+    '''
+    return val * 0.514444
+
+@njit
 def mag(u, v, missing=MISSING):
     '''
     Compute the magnitude of a vector from its components
@@ -102,3 +167,12 @@ def _vec2comp(wdir, wspd):
     u = wspd * np.sin(np.radians(wdir)) * -1
     v = wspd * np.cos(np.radians(wdir)) * -1
     return u, v
+
+#@njit
+#def QC(val):
+#    '''
+#        Tests if a value is type np.nan
+#
+#        '''
+#    if np.isnan(val): return False
+#    return True

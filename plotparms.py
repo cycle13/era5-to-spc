@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 pwd = os.environ['PWD']
 PLOT_DIR = pwd + '/images'
@@ -7,12 +6,6 @@ PLOT_DIR = pwd + '/images'
 skip = 3
 alpha=0.4
 sigma = 1.
-
-#u_name = 'U component of wind'
-#v_name = 'V component of wind'
-#t_name = 'Temperature'
-#z_name = 'Geopotential Height'
-#rh_name = 'Relative humidity'
 
 levels = {
           'cape': [100,250,500,1000,1500,2000,2500,3000,3500,4000,5000,6000],
@@ -28,7 +21,7 @@ colors = {
 
 # Controls the plotting routines requiring the use of SHARPpy and its lifting
 # routines.
-sharppy_dict = {
+SHARPPY_DICT = {
     'mucape' : {'cf_data': 'mulpl', # Lifted Parcel Height (m)
                 'c1_data': 'mulpl', # Lifted Parcel Height (m; contour)
                 'c2_data': 'mucape', # MUCAPE
@@ -57,10 +50,31 @@ sharppy_dict = {
                'plot_levs': [None,
                             [25,30,35,40,45,50,55,60,65,70,75,80],
                              None]
+    },
+
+    'effh' : {'cf_data': 'ebot', # Effective inflow base (m)
+               'c1_data': 'esrh', # Effective SRH
+               'c2_data': None,
+               #'plot_barbs': [True, ('storm_u', 'storm_v')],
+               'plot_barbs': [False, ()],
+               'plot_info': 'Eff. Inflow Base (fill, m AGL), ESHR (m2/s2) and storm motion (kt)',
+               'plot_levs': [[10, 250, 1000, 3000],
+                             [25,50,100,200,300,400,500,600,700,800,900,1000],
+                              None]
+    },
+
+    'stpc' : {'cf_data': 'mlcin', # Effective inflow base (m)
+               'c1_data': 'estp', # Effective SRH
+               'c2_data': None,
+               'plot_barbs': [False, ()],
+               'plot_info': 'Significant Tornado Parameter (eff layer) and MLCIN (J/kg, shaded at 25 and 100)',
+               'plot_levs': [[-500, -100, -25],
+                             [.25,.5,1,2,3,4,5,6,7,8,9,10],
+                              None]
     }
 }
 
-other_dict = {
+ROUTINE_DICT = {
     #'700mb': [
     #          [70,105],
     #          [70, 80, 90],
@@ -100,7 +114,7 @@ other_dict = {
 
 
 
-plot_kwargs = {
+PLOT_KWARGS = {
     'mucape': [dict(colors=['#9ef94e','#f7d549','#c3882f'], alpha=alpha),
                dict(colors='k', linewidths=1, linestyles=[(0, (15,9))]),
                dict(colors=colors['cape'], linewidths=[1,1,2,2,2,2,2,2,2,2,2,2]),
@@ -112,6 +126,18 @@ plot_kwargs = {
                dict()],
     'eshr':   [dict(),
                dict(colors='#244f88', linewidths=[1,1,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]),
+               dict(), dict()],
+    'effh':   [dict(colors=['#f1b1bc','#eb7370','#da4238'], alpha=alpha),
+               dict(colors=['#559df5','#559df5','#559df5','#244587','#244587','#244587',
+                            '#244587','#244587','#244587','#244587','#244587','#244587',
+                            '#244587','#244587','#244587','#244587','#244587','#244587'],
+                            linewidths=[0.5,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2]),
+               dict(), dict()],
+    'stpc':   [dict(colors=['#4caee3', '#69e7e7'], alpha=alpha),
+               dict(colors=['#ed8433','#ed8433','#ed8433','#e83224','#e83224','#e83224',
+                            '#801811','#801811','#801811','#801811','#801811','#801811'],
+                    linewidths=[1,1.5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+                    linestyles=['--','--','-','-','-','-','-','-','-','-','-','-','-']),
                dict(), dict()]
 }
 
@@ -226,3 +252,6 @@ mrms_cols = ['#9b9b9a','#cccbcc','#4f9af8','#0026f5','#75f94c',
              '#59c139','#fffd55','#f8cc46','#ee6f2e','#eb3323','#bd401e','#8d1a10',
              '#ea40f7','#8d41c5']
 """
+
+# Merge the plotting dictionaries
+PLOT_DICT = {**SHARPPY_DICT, **ROUTINE_DICT}

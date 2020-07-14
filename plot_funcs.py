@@ -1,28 +1,28 @@
 import xarray as xr
 import pandas as pd
 import numpy as np
-import numpy.ma as ma
 from plotparms import *
+from sharptab.constants import G, ZEROCNK, MS2KTS
+import sharptab.sharppy_funcs as sharppy_funcs
+import sharptab.thermo as thermo
 
-from mpl_toolkits.basemap import Basemap
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pylab
+from mpl_toolkits.basemap import Basemap
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy.ndimage import gaussian_filter
 
-from sharptab.constants import *
-import sharptab.thermo as thermo
-import sharptab.profile as profile
-import sharptab.params as params
-import sharptab.interp as interp
-import sharptab.winds as winds
-import sharptab.utils as utils
-
 import metpy.calc as mpcalc
-
 from datetime import datetime
 
-def _make_basemap(bounds):
+"""
+    plot_funcs.py
+
+    Primary function controlling the actual plot creation. Plot parameters are
+    specified in the plotparms.py file within this top-level directory.
+
+"""
+
+def make_basemap(bounds):
     m_ = Basemap(projection='stere', llcrnrlon=bounds[0], llcrnrlat=bounds[1],
                  urcrnrlon=bounds[2], urcrnrlat=bounds[3], lat_ts=50,
                  lat_0=50, lon_0=-97., resolution='i')
@@ -33,13 +33,12 @@ def _make_basemap(bounds):
     return m_
 
 def make_plots(filename, bounds):
-
     # Data read in
     data = xr.open_dataset(filename)
     # We don't need the full dataset. Figure out what data lies in our specified
-    # domain and subset it.
-    ds = data.sel(latitude=slice(bounds[3]+1, bounds[1]-1),
-                  longitude=slice(bounds[0]-1, bounds[2]+1))
+    # domain and subset it. Give a litte buffer for the map projection.
+    ds = data.sel(latitude=slice(bounds[3]+2, bounds[1]-2),
+                  longitude=slice(bounds[0]-2, bounds[2]+2))
     pres = ds.level.values
     hght = ds.z.values / G
     uwnd = ds.u.values
@@ -67,7 +66,7 @@ def make_plots(filename, bounds):
     ax = pylab.axes([ax_left, ax_bot, 0.975, ax_hght], xticks=[], yticks=[])
 
     # Create the re-usable basemap plotting object
-    m = _make_basemap(bounds)
+    m = make_basemap(bounds)
     x, y = m(lons, lats)
     dx, dy = mpcalc.lat_lon_grid_deltas(lons, lats)
 
@@ -80,34 +79,35 @@ def make_plots(filename, bounds):
         # calculations
         prof_data = {'pres':pres, 'tmpc':tmpc[t], 'dwpc':dwpc[t],
                      'hght':hght[t], 'wdir':wdir[t], 'wspd':wspd[t]}
-        print("Entering SHARPpy for calculations")
-        arrs = sharppy_calcs(**prof_data)
-
-        for parm in sharppy_dict.keys():
+        arrs = sharppy_funcs.calcs(**prof_data)
+        for parm in PLOT_DICT.keys():
             cf_data = None; cf = None; cb = None
             c1_data = None; c1 = None; clab1 = None
             c2_data = None; c2 = None; clab2 = None
             barb = None
-            meta = sharppy_dict[parm]
+            meta = PLOT_DICT[parm]
 
             if meta['cf_data']:
                 cf_data = gaussian_filter(arrs[meta['cf_data']], sigma=sigma)
                 cf = m.contourf(x, y, cf_data, meta['plot_levs'][0],
-                                **plot_kwargs[parm][0])
+                                **PLOT_KWARGS[parm][0])
 
             if meta['c1_data']:
-                if parm not in ['eshr']:    # Careful with nan-possible parms
+                # Carefule with nan-possible parms such as effective inflow and
+                # other shear calculations.
+                if parm not in ['eshr', '']:
                     c1_data = gaussian_filter(arrs[meta['c1_data']], sigma=sigma)
                 else:
                     c1_data = arrs[meta['c1_data']]
+
                 c1 = m.contour(x, y, c1_data, meta['plot_levs'][1],
-                               **plot_kwargs[parm][1])
+                               **PLOT_KWARGS[parm][1])
                 clab1 = pylab.clabel(c1, fmt="%d", inline_spacing=8)
 
             if meta['c2_data']:
                 c2_data = gaussian_filter(arrs[meta['c2_data']], sigma=sigma)
                 c2 = m.contour(x, y, c2_data, meta['plot_levs'][2],
-                               **plot_kwargs[parm][2])
+                               **PLOT_KWARGS[parm][2])
                 clab2 = pylab.clabel(c2, fmt="%d", inline_spacing=8)
 
             # Wind barbs
@@ -126,7 +126,7 @@ def make_plots(filename, bounds):
 
             # Colorbar
             if meta['cf_data']:
-                cax = inset_axes(ax, width="25%", height="2.5%", loc="lower left",
+                cax = inset_axes(ax, width="18%", height="2.5%", loc="lower left",
                                  bbox_to_anchor=(-0.002,-0.055,1,1),
                                  bbox_transform=ax.transAxes)
                 cb = pylab.colorbar(cf, cax=cax, orientation='horizontal',
@@ -140,9 +140,9 @@ def make_plots(filename, bounds):
             img_info = "%s %s" % (valid_date, meta['plot_info'])
             t1 = ax.annotate(img_info, xy=(0.5, -0.031), va='top', ha='center',
                              xycoords='axes fraction', fontsize=11)
-            t2 = ax.annotate('ERA5 0.25 x 0.25 deg Global Reanalysis', xy=(0,1),
-                             va='bottom', xycoords='axes fraction', fontsize=12,
-                             color='b')
+            t2 = ax.annotate('ERA5 0.25 x 0.25 deg Global Reanalysis-SPC Meld Project',
+                             xy=(0,1), va='bottom', xycoords='axes fraction',
+                             fontsize=12, color='b')
             save_name = "%s/%s_%s_%s.png" % (PLOT_DIR, 'MW', parm, save_date)
             #pylab.savefig(save_name, dpi=pylab.gcf().dpi, transparent=True)
             pylab.savefig(save_name, dpi=pylab.gcf().dpi)
@@ -182,75 +182,3 @@ def _clean_objects(cf, cb, c1, c2, clab1, clab2, t2, t1, barb):
     #        label.remove()
     t1.remove()
     t2.remove()
-
-
-def sharppy_calcs(**kwargs):
-    tmpc = kwargs.get('tmpc')
-    dwpc = kwargs.get('dwpc')
-    hght = kwargs.get('hght')
-    wdir = kwargs.get('wdir')
-    wspd = kwargs.get('wspd')
-    pres = kwargs.get('pres')
-
-    # For our jitted sharppy routines, need to be REALLY careful with units or
-    # things will break. Probably overkill here, but worth it to be safe!
-    tmpc = np.array(tmpc, dtype='float64')
-    dwpc = np.array(dwpc, dtype='float64')
-    hght = np.array(hght, dtype='float64')
-    wdir = np.array(wdir, dtype='float64')
-    wspd = np.array(wspd, dtype='float64')
-    pres = np.array(pres, dtype='int32')
-
-    mucape = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    mlcape = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    mlcin = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    mulpl = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    ebot = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    etop = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    ebwd_u = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    ebwd_v = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-    eshr = np.zeros((tmpc.shape[1], tmpc.shape[2]))
-
-    t1 = datetime.now()
-    for j in range(tmpc.shape[1]):
-        for i in range(tmpc.shape[2]):
-            prof = profile.create_profile(pres=pres, tmpc=tmpc[:,j,i],
-                                          hght=hght[:,j,i], dwpc=dwpc[:,j,i],
-                                          wspd=wspd[:,j,i], wdir=wdir[:,j,i])
-
-            # Effective inflow and shear calculations
-            eff_inflow = params.effective_inflow_layer(prof)
-            ebot[j,i] = interp.to_agl(prof, interp.hght(prof, eff_inflow[0]))
-            etop[j,i] = interp.to_agl(prof, interp.hght(prof, eff_inflow[1]))
-
-            # This isn't quite right...need to find midpoint between eff Inflow
-            # bottom and EL
-            ebwd_u[j,i], ebwd_v[j,i] = winds.wind_shear(prof, pbot=eff_inflow[0],
-                                                        ptop=500)
-            eshr[j,i] = utils.mag(ebwd_u[j,i], ebwd_v[j,i])
-
-            # Parcel buoyancy calculations
-            mupcl = params.parcelx(prof, flag=3)
-            mlpcl = params.parcelx(prof, flag=4)
-            mucape[j,i] = mupcl.bplus
-            mulpl[j,i] = mupcl.lplhght
-            mlcape[j,i] = mlpcl.bplus
-            mlcin[j,i] = mlpcl.bminus
-
-    eshr = ma.where(eshr < 25., np.nan, eshr)
-    ebwd_u = ma.where(eshr < 25., np.nan, ebwd_u)
-    ebwd_v = ma.where(eshr < 25., np.nan, ebwd_v)
-
-    t2 = datetime.now()
-    print("Calculations took: ", str((t2-t1).seconds), " seconds")
-    ret = {'mucape' : mucape,
-           'mlcape' : mlcape,
-           'mlcin' : mlcin,
-           'mulpl' : mulpl,
-           'ebot' : ebot,
-           'etop': etop,
-           'ebwd_u': ebwd_u,
-           'ebwd_v': ebwd_v,
-           'eshr': eshr
-    }
-    return ret

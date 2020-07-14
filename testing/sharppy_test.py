@@ -1,8 +1,11 @@
 import numpy as np
 import xarray as xr
 import sharppy.sharptab.profile as SHARPPY_PROFILE
-import sharppy.sharptab.params as SHARPPY_PARAMS
-from sharptab.constants import G, ZEROCNK
+import sharppy.sharptab.params as params
+import sharppy.sharptab.interp as interp
+import sharppy.sharptab.winds as winds
+
+from sharppy.sharptab.constants import G, ZEROCNK
 
 sat_pressure_0c = 6.112
 ZEROCNK = 273.15        # Zero C to K
@@ -60,7 +63,7 @@ def vapor_pressure(pressure, mixing):
 #from metpy.units import units
 
 # Data Read
-fname = '/Users/leecarlaw/scripts/era5-spc/data/20200701_00-20200701_22.nc'
+fname = '../data/20200701_00-20200701_22.nc'
 ds = xr.open_dataset(fname)
 
 pres = ds.level.values
@@ -81,8 +84,11 @@ for j in range(tmpc.shape[2]):
         prof = SHARPPY_PROFILE.create_profile(pres=pres,tmpc=tmpc[t,:,j,i],
                           hght=hghts[t,:,j,i],dwpc=dwpc[t,:,j,i],
                           wspd=wspds[t,:,j,i],wdir=wdirs[t,:,j,i])
-        #pcl = SHARPPY_PARAMS.parcelx( prof, flag=6 )
-        eff_inflow = SHARPPY_PARAMS.effective_inflow_layer(prof)
-        print(j,i,'$$$$$$$')
-#print(pcl.bplus)
-#mlpcl = SHARPPY_PARAMS.parcelx( prof, flag=4 )
+        eff_inflow = params.effective_inflow_layer(prof)
+        ebot_hght = interp.to_agl(prof, interp.hght(prof, eff_inflow[0]))
+        etop_hght = interp.to_agl(prof, interp.hght(prof, eff_inflow[1]))
+        
+        srwind = params.bunkers_storm_motion(prof)
+        effective_srh = winds.helicity(prof, ebot_hght, etop_hght, stu = srwind[0], stv = srwind[1])
+
+        
